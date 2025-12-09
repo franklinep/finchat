@@ -1,0 +1,160 @@
+\documentclass[12pt,spanish, singlespacing,]{MastersDoctoralThesis}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[none]{hyphenat}
+\usepackage{palatino}
+\usepackage{acronym}
+\spacing{1.5}
+\usepackage[acronym,nomain]{glossaries}
+%\usepackage[backend=bibtex,style=authoryear,natbib=true]{biblatex}
+%\addbibresource{main.bib}
+\usepackage[autostyle=true]{csquotes}
+\usepackage{pdflscape,booktabs}
+\usepackage{afterpage}
+\newcommand\blankpage{%
+    \null
+    \thispagestyle{empty}%
+    \addtocounter{page}{0}%
+    \newpage}
+
+\usepackage{listings}
+\renewcommand{\lstlistingname}{Código}
+\renewcommand\lstlistlistingname{Índice de Código}
+
+\usepackage{float}
+\usepackage{url}
+\makeatletter
+\g@addto@macro{\UrlBreaks}{\UrlOrds}
+\makeatother
+
+\thesistitle{}
+\supervisor{CESAR JESUS LARA AVILA}
+\examiner{}
+\degree{}
+\author{FRANKLIN ESPINOZA PARI}
+\subject{}
+\keywords{}
+\university{\href{http://www.uni.edu.pe/}{Universidad Nacional de Ingenier\'ia}}
+\department{\href{http://fc.uni.edu.pe/fc/index.php/escuelas/ciencia-de-la-computacion}{}}
+\faculty{\href{http://fc.uni.edu.pe/fc/}{}}
+\hypersetup{pdftitle=\ttitle}
+\hypersetup{pdfauthor=\authorname}
+\hypersetup{pdfkeywords=\keywordnames}
+\sloppy
+\decimalpoint
+\begin{document}
+\frontmatter
+\pagestyle{plain}
+\begin{titlepage}
+\begin{center}
+%\textsc{\huge \univname}\\[0.5cm]
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.3\textwidth]{Figures/Escudo_UNI.jpg}
+\end{figure}
+
+\textsc{\huge \univname}\\[0.3cm]
+\textsc{\Large Facultad de Ciencias}\\[0.2cm]
+\textsc{\large Escuela Profesional de Ciencia de la Computaci\'on}\\[2cm]
+\textsc{\LARGE \textit{Sistema Conversacional Multiagente para la Automatización de Deducciones Tributarias en Perú mediante OCR y Validación SUNAT}}\\[1cm]
+{\Large \textbf{SEMINARIO DE TESIS II}}
+{\huge \bfseries \ttitle}\\[2cm]
+% Thesis title
+%\bigskip
+%\HRule \\[0.8cm] % Horizontal line
+
+%\begin{minipage}{1.5\textwidth}
+%\begin{flushleft} \large
+\bigskip
+\bigskip
+\large\emph{Autor:}
+{\authorname}\\
+\large\emph{Asesor:}
+{\supname}
+%\end{flushleft}
+%\end{minipage}
+%\\[2cm]
+\\[1cm]
+{\large OCTUBRE, 2025}\\[4cm]
+
+\vfill
+\end{center}
+\end{titlepage}
+\afterpage{\blankpage}
+%\cleardoublepage
+%\renewcommand{\abstractname}{Abstract}
+\begin{abstract}
+\addchaptertocentry{\abstractname}
+
+El presente trabajo propone el diseño e implementación de un sistema conversacional multiagente para automatizar el registro y la validación de gastos deducibles en el contexto tributario peruano. El problema aborda la captura de información desde comprobantes heterogéneos (PDF e imágenes), la normalización de campos relevantes (RUC, tipo/serie/número, fecha, monto y emisor), la detección de duplicados y la verificación contra fuentes oficiales de la SUNAT, tareas que hoy suelen ejecutarse de forma manual, con altos costos de tiempo y propensión a errores.
+
+La solución se estructura en una arquitectura basada en servicios: un agente de ingesta con OCR que extrae texto de documentos (PDF/imágenes) y lo transforma en unidades semánticas; un agente de deduplicación que previene el registro redundante; un agente de validación que consulta los servicios de SUNAT para verificar la consistencia y vigencia de los comprobantes; y un orquestador conversacional que guía al usuario, explica decisiones y solicita datos faltantes. El backend expone un webhook para recepción de archivos, persistencia transaccional de artefactos y trazabilidad de cada trabajo, con un modelo de datos que separa el blob del archivo y los fragmentos OCR para facilitar auditoría y recuperación.
+
+La metodología de desarrollo fue incremental, organizada en sprints semanales, con énfasis en pruebas unitarias e integración para asegurar idempotencia, manejo de errores y repetibilidad. Como resultado, se obtuvo un prototipo funcional capaz de: (i) recibir documentos desde un canal conversacional, (ii) realizar OCR y almacenamiento estructurado, (iii) detectar duplicados de forma determinista, y (iv) preparar la validación con SUNAT. Se discuten decisiones de diseño, consideraciones legales y de privacidad para el tratamiento de datos tributarios, y un plan de evaluación que contempla precisión de OCR, tasa de falsos duplicados, latencia extremo a extremo y exactitud de verificación frente a SUNAT. Finalmente, se delinean extensiones futuras: interfaz de chat para usuarios finales, enriquecimiento con RAG, y despliegue seguro en producción.
+
+\textbf{Palabras clave:} OCR, validación tributaria, SUNAT, multiagente, sistemas conversacionales, RAG, deducciones, Perú, FastAPI.
+\end{abstract}
+\afterpage{\blankpage}
+\tableofcontents
+%\afterpage{\blankpage}
+\listoffigures
+%\afterpage{\blankpage}
+%\listoftables
+%\afterpage{\blankpage}
+%\listoftables
+%\lstlistoflistings
+%\afterpage{\blankpage}
+\newpage
+\begin{center}
+{\huge Índice de Acrónimos}\\[2cm]
+\end{center}
+\bigskip
+\begin{tabular}{ l c l }
+\textbf{API} & & Application Programming Interface\\
+\textbf{AJAX} & & Asynchronous JavaScript And XML\\
+\textbf{ETC} & & Etcétera \\
+
+\end{tabular}
+\afterpage{\blankpage}
+
+%\newpage
+%\begin{center}
+%{\huge \textit{Agradecmientos}}\\[1.5cm]
+%\end{center}
+
+%The acknowledgements and the people to thank go here, don't forget to include your project advisor\ldots
+%With thanks to my friends, my family, my cats and Chris
+
+\afterpage{\blankpage}
+
+\mainmatter
+\pagestyle{thesis}
+\input{Chapters/Cap1}
+%\newpage
+%$\ $
+%\thispagestyle{empty} % para que no se numere esta pagina
+\input{Chapters/Cap2}
+%\newpage
+$\ $
+%\thispagestyle{empty} % para que no se numere esta pagina
+\input{Chapters/Cap3}
+%\newpage
+$\ $
+%\thispagestyle{empty} % para que no se numere esta pagina
+\input{Chapters/Cap4}
+%\newpage
+$\ $
+%\thispagestyle{empty} % para que no se numere esta pagina
+\input{Chapters/Cap5}
+
+
+
+\bibliography{main}
+\bibliographystyle{unsrt}
+\afterpage{\blankpage}
+
+\appendix
+\input{Appendix/AppendixA}
+
+\end{document}

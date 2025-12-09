@@ -1,0 +1,114 @@
+\chapter{Metodología}
+\label{chap:metodologia}
+
+Este capítulo describe el enfoque metodológico aplicado al diseño e implementación de la arquitectura conversacional multiagente para la gestión de comprobantes tributarios deducibles en el Perú. Se detalla el hardware y software empleado, la arquitectura técnica y de agentes, el flujo de API, los principios de diseño, el modelo de datos, los criterios de calidad y seguridad, así como el plan de evaluación y métricas.
+
+\section{Enfoque general}
+El sistema opera sobre dos rutas de procesamiento complementarias:
+\begin{enumerate}
+  \item \textbf{Ruta de archivos (pipeline de ingesta):} flujo determinista e idempotente para recibir PDFs/imágenes, ejecutar OCR y parsing, validar RUC/condición, clasificar deducibilidad y persistir resultados. Implementado como \emph{workflow} de cinco agentes en Agno.
+  \item \textbf{Ruta de consultas (ReAct):} un agente conversacional planifica y ejecuta herramientas ORM para responder preguntas agregadas del usuario (filtros por RUC, fechas, montos, categoría, totales).
+\end{enumerate}
+La selección de ruta se basa en el tipo de solicitud (subida de archivos o mensaje de texto) y se ejecuta en un backend FastAPI que expone los endpoints \texttt{/comprobantes/subir} y \texttt{/comprobantes/consultar}.
+
+\section{Hardware utilizado}
+\begin{itemize}
+  \item \textbf{Procesador:} CPU Intel Core i7-12700KF 16 nucleos
+  \item \textbf{Memoria RAM:} 32 GB
+  \item \textbf{Tarjeta gráfica:} GPU RTX 4070 super 12 GB
+  \item \textbf{Dispositivo móvil de prueba:} Teléfono Android con 8 GB RAM
+
+\section{Software utilizado}
+\begin{itemize}
+  \item \textbf{Backend:} Python 3.11, FastAPI, Agno (agentes y workflows), SQLAlchemy ORM, PostgreSQL 16.
+  \item \textbf{OCR y PDF:} Pipeline 1 (modelo OCR local servido vía Ollama); Pipeline 2 (PaddleOCR para imágenes + PyMuPDF para PDFs nativos).
+  \item \textbf{LLMs:} modelos locales en Ollama de distintos tamaños (4B, 8B, 12B, 20B) para parsing y razonamiento; uso comparativo de tamaños para balancear latencia/calidad.
+  \item \textbf{Móvil:} Expo/React Native, \texttt{react-navigation}, \texttt{react-native-paper}; pantallas de login/registro, chat, carga de comprobantes y detalle de recibo.
+  \item \textbf{Herramientas auxiliares:} librerías de hashing (\texttt{sha256}) para deduplicación, validación de RUC/condición vía servicio SUNAT, almacenamiento temporal de blobs y manejo de sesiones de usuario.
+\end{itemize}
+
+\section{Arquitectura}
+\subsection{Agentes secuenciales (pipeline de ingesta)}
+El \emph{workflow} \texttt{IngestaWorkflow} coordina cinco agentes:
+\begin{enumerate}
+  \item \textbf{Agente Validador de Comprobante:} calcula \texttt{sha256}, detecta duplicados por hash y por combinación (usuario, emisor, serie, número).
+  \item \textbf{Agente Parseador:} ejecuta OCR según MIME o tipo de documento (\texttt{PyMuPDF} para PDF nativo; \texttt{PaddleOCR}/modelo local para imagen), invoca LLM local para estructurar campos y aplica \emph{fallback} heurístico con expresiones regulares.
+  \item \textbf{Agente Validador SUNAT:} consulta estado y condición del RUC, obtiene CIIU y aplica reglas básicas de deducibilidad.
+  \item \textbf{Agente Clasificador:} asigna categoría de gasto y porcentaje deducible según reglas SUNAT, registrando la versión de regla.
+  \item \textbf{Agente Persistencia:} usa un \emph{prompt} con \emph{few shots} para revisar el contexto (emisor, comprobante, detalle, validación, clasificación, hash y flags) y detectar inconsistencias suaves (totales que no cuadran, serie/número vacíos, RUC ausente, fechas fuera de rango). La decisión de persistir sigue siendo determinista: si las validaciones duras pasan, se ejecuta el \emph{upsert} idempotente mediante repositorios SQLAlchemy y se confirma con \texttt{commit}; de lo contrario, se aborta con \texttt{rollback}.
+\end{enumerate}
+
+
+\subsection{Agente ReAct para consultas}
+Un agente Agno con \texttt{tool\_choice} forzado utiliza \emph{QueryToolkit} para:
+\begin{itemize}
+  \item Búsqueda de comprobantes con filtros (RUC, fechas, categoría, montos, límite de resultados).
+  \item Cálculo de totales y agregaciones (promedio, suma, conteo; agrupación opcional por categoría).
+  \item Búsqueda por emisor (RUC o nombre) y detalle de comprobantes asociados.
+\end{itemize}
+Las herramientas operan sobre el ORM, retornan JSON estructurado y el agente genera una respuesta auditada con los resultados.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\textwidth]{Figures/Arquitectura.png}
+  \caption{Arquitectura general del sistema.}
+  \label{fig:arquitectura}
+\end{figure}
+
+
+\section{Flujo de la API}
+\begin{enumerate}
+  \item \textbf{Subida de comprobantes:} el cliente móvil envía archivos a \texttt{/comprobantes/subir}, se ejecuta el pipeline de cinco pasos y se retorna: ID, hash, bandera de duplicado, campos parseados, validación SUNAT y clasificación.
+  \item \textbf{Consultas:} el cliente envía texto a \texttt{/comprobantes/consultar}; el agente ReAct traduce la intención a filtros ORM, ejecuta las herramientas y retorna respuesta en lenguaje natural más datos estructurados.
+\end{enumerate}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\textwidth]{Figures/api.png}
+  \caption{Flujo de la API.}
+  \label{fig:flujoapi}
+\end{figure}
+
+\section{Patrones y principios de diseño}
+\begin{itemize}
+  \item \textbf{Arquitectura por funcionalidades (features):} agrupación por contexto de dominio, como autenticación y agentes.
+  \item \textbf{Inversión de dependencias:} Los repositorios abstraen el ORM, mientras que los agentes consumiran las interfaces de de estos repositorios, evitando dependencia directa con el ORM.
+  \item \textbf{Workflows en Agno:} Los workflows permiten crear flujos de agentes deterministas y controlados. Cada agente maneja una tarea especifica pesada, las salidas de cada agente son pasadas como argumentos al siguiente.
+\end{itemize}
+
+\section{Diseño de la base de datos y persistencia}
+El esquema relacional incluye:
+\begin{itemize}
+  \item \texttt{usuario} (cuentas), \texttt{emisor} (RUC, razón social, CIIU, estado/condición).
+  \item \texttt{comprobante} (tipo, serie, número, fecha, monto, moneda, origen, hash, estado, deducible, duplicado; FKs a usuario y emisor; unicidad por (usuario, emisor, serie, número) y por hash).
+  \item \texttt{detalle\_comprobante} (ítems y montos), \texttt{validacion} (estado/condición RUC, CIIU, coincidencia de nombre, reglas), \texttt{clasificacion} (categoría, porcentaje, versión de regla).
+  \item \texttt{ocr\_pagina} (texto por página y confianza), \texttt{estado\_trabajo} (seguimiento de trabajos), \texttt{historial\_chat} (mensajes de conversación).
+\end{itemize}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\textwidth]{Figures/DB.png}
+  \caption{Esquema relacional de la base de datos.}
+  \label{fig:bd}
+\end{figure}
+
+\section{Calidad, seguridad y cumplimiento}
+\begin{itemize}
+  \item \textbf{Privacidad:} uso de modelos locales en Ollama para evitar exponer boletas a servicios externos.
+  \item \textbf{Seguridad:} autenticación con middleware JWT, cifrado en tránsito y manejo de sesiones por usuario.
+  \item \textbf{Confiabilidad:} se valida la duplicidad de los comprobantes antes de procesarlos y se ejecuta un rollback en caso de fallos.
+\end{itemize}
+
+\section{Plan de evaluación y métricas}
+\begin{itemize}
+  \item \textbf{OCR:} exactitud por campo (RUC, razón social, serie, número, fecha, monto e items encontrados), CER/WER y confianza promedio; robustez ante distintas calidades de imagen.
+  \item \textbf{Pipeline:} latencia extremo a extremo y \emph{throughput}; tasa de deduplicación efectiva.
+  \item \textbf{LLMs:} tiempo de respuesta y consumo de GPU/RAM para tamaños 8B/12B/20B en tareas de parsing y consulta; calidad percibida de la respuesta conversacional.
+  \item \textbf{Datos de prueba:} mezcla de comprobantes reales y sintéticos etiquetados; partición para evaluación; scripts de generación controlada para estrés de formatos.
+\end{itemize}
+
+\section{Riesgos y mitigaciones}
+\begin{itemize}
+  \item \textbf{Variabilidad de imágenes:} preprocesamiento (normalización, reducción de ruido, realce de contraste) y retroalimentación al usuario cuando la confianza OCR es baja.
+  \item \textbf{Picos de carga:} colas y lotes internos para el procesamiento paralelo de archivos PDFs e imágenes.
+\end{itemize}

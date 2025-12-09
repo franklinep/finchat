@@ -1,0 +1,24 @@
+\chapter{Marco Teórico}
+
+En este capítulo se presentan los fundamentos conceptuales y tecnológicos que sustentan el sistema propuesto para la gestión y análisis de comprobantes tributarios. Se abordan: (i) reconocimiento óptico de caracteres (OCR), (ii) sistemas de gestión de bases de datos y mapeo objeto–relacional (ORM), (iii) arquitectura basada en agentes (\textit{agentic AI}) y patrones de orquestación, y (iv) los criterios normativos de deducibilidad para personas naturales en el Perú.
+
+\section{Reconocimiento Óptico de Caracteres (OCR)}
+El \textbf{Reconocimiento Óptico de Caracteres (OCR)} convierte texto impreso o manuscrito en texto digital. Un flujo típico incluye: preprocesamiento (normalización, reducción de ruido y corrección de inclinación), segmentación, reconocimiento y postprocesamiento lingüístico. En este proyecto se emplea \textit{PaddleOCR} como módulo principal para digitalizar boletas e imágenes escaneadas, generando texto que luego se valida, clasifica y persiste.
+
+\section{Sistemas de Bases de Datos y ORM}
+Un \textbf{SGBD} relacional organiza datos en tablas con claves e integridad referencial. Para el MVP se utiliza \textbf{SQLite} (ligero y embebido) y para despliegue productivo \textbf{PostgreSQL}. El acceso se realiza con \textbf{SQLAlchemy}, que permite definir entidades de dominio y relaciones mediante clases, mejorando mantenibilidad y portabilidad.
+
+\section{Arquitectura basada en agentes y patrones de orquestación}
+El sistema adopta una \textbf{arquitectura multiagente} donde componentes autónomos cooperan (ingesta/OCR, validación, clasificación, consultas analíticas). En la ruta de consultas se aplica el esquema \textit{ReAct} (razonar–actuar–observar) para planificar, ejecutar herramientas (p.\,ej., consultas ORM) y verificar resultados antes de responder. Este patrón se emplea ampliamente para mejorar la planificación y reducir alucinaciones frente a enfoques de \textit{zero-shot} o \textit{chain-of-thought} puros.
+
+Para el \textbf{orquestador} se adopta el \emph{Patrón de Lógica Personalizada}, recomendado cuando el flujo de trabajo requiere \emph{ramas condicionales y control fino}, y no encaja en plantillas estándar como los patrones secuenciales o paralelos. Este patrón permite enrutar dinámicamente subtareas a subagentes especializados (p.\,ej., validador SUNAT, clasificador tributario, persistencia) y culminar con un agente de respuesta, asumiendo el costo de mayor complejidad de diseño y mantenimiento \cite{google-cloud-agentic-patterns}.
+
+La arquitectura se alinea con principios de \textit{Arquitectura Limpia} y separación de capas (dominio, aplicación, infraestructura e interfaz), lo que facilita la prueba de reglas tributarias, la idempotencia de la ingesta y la trazabilidad de extremo a extremo.
+
+\section{Normativa y criterios de deducibilidad en el Perú}
+Para personas naturales con rentas de cuarta o quinta categoría, la SUNAT reconoce una \textbf{deducción adicional global de hasta 3 UIT} (S/ 16\,050 para 2025), distribuida según el tipo de gasto. De acuerdo con la guía oficial, los porcentajes de deducción aplicables incluyen, entre otros: \emph{15\%} para \textit{restaurantes y hoteles}, \emph{30\%} para \textit{servicios profesionales} y \textit{alquiler de inmuebles}, y \emph{100\%} de \textit{aportaciones a EsSalud por trabajadores del hogar}, siempre dentro del tope de 3 UIT \cite{gobpe-gastos-deducibles}.
+
+Asimismo, para que el gasto sea deducible, la \textbf{identificación del contribuyente} (DNI o RUC) debe estar correctamente consignada en el comprobante y los establecimientos (p.\,ej., hoteles y restaurantes) deben cumplir condiciones formales específicas (estado habido, unica actividad principal, entre otros) \cite{sunat-consideraciones-deducibles}. Estas reglas informan el diseño del \emph{pipeline} (validaciones SUNAT, detección de duplicados, motor de reglas de deducibilidad) y la lógica de clasificación tributaria en la capa de dominio.
+
+\section{Síntesis}
+La combinación de OCR robusto, persistencia relacional con ORM y una orquestación \textit{agentic} con \emph{lógica personalizada} y ReAct permite: (i) separar tareas determinísticas (OCR, scraping, persistencia) del razonamiento del agente, (ii) auditar decisiones (clasificación/porcentajes) frente a reglas tributarias oficiales, y (iii) responder consultas analíticas de forma segura y trazable.

@@ -1,0 +1,60 @@
+\chapter{Introducción}
+
+En el contexto peruano, tanto los trabajadores independientes como quienes laboran en relación de dependencia pueden deducir determinados gastos de sus rentas de trabajo, reduciendo así su carga tributaria anual. De acuerdo con la normativa vigente de la Superintendencia Nacional de Aduanas y de Administración Tributaria (SUNAT), los principales gastos deducibles son:
+
+\begin{enumerate}
+    \item \textbf{Hoteles y restaurantes:} 15\% del gasto efectuado.
+    \item \textbf{Servicios profesionales:} 30\% del gasto efectuado.
+    \item \textbf{Alquiler de inmuebles:} 30\% del gasto efectuado.
+    \item \textbf{Aportes a EsSalud por trabajadores del hogar:} 100\% del gasto efectuado.
+\end{enumerate}
+
+Estos beneficios constituyen una oportunidad para los contribuyentes que buscan optimizar su economía personal mediante una adecuada gestión de sus deducciones tributarias. No obstante, en la práctica, muchas personas desconocen cuáles de sus gastos son efectivamente deducibles o cuánto han acumulado a lo largo del año fiscal. Ello se debe, principalmente, a que no todas las boletas se registran de manera automática en la plataforma de la SUNAT—en especial las emitidas en formato físico—y a dificultades en la administración de comprobantes de pago, la heterogeneidad de formatos y los errores derivados del procesamiento manual de información.
+
+Frente a esta problemática, el presente trabajo propone el diseño e implementación de un sistema experimental para la \textbf{gestión automatizada de boletas y comprobantes}, clasificándolos según las categorías establecidas por la SUNAT y las condiciones necesarias para que el gasto sea deducible. El sistema integrará tecnologías de \textit{Reconocimiento Óptico de Caracteres} (OCR) mediante \textbf{PaddleOCR}, junto con un modelo de base de datos local gestionado con un \textbf{ORM} (mapeo objeto–relacional) sobre \textbf{SQLite}. Asimismo, se adoptará una arquitectura \textbf{multiagente}, en la que agentes especializados colaboran para ejecutar tareas específicas, tales como la lectura, la clasificación y la explicación de los datos obtenidos.
+
+Adicionalmente, el sistema permitirá la generación automática de reportes, paneles de control y métricas de deducción, brindando al usuario una visión integral de sus gastos deducibles. De este modo, se busca facilitar el cumplimiento tributario y promover una mejor organización financiera personal.
+
+\section{Motivación}
+
+La motivación de este proyecto surge de una necesidad frecuente entre los contribuyentes: la ausencia de herramientas tecnológicas que automaticen y sistematicen la gestión de comprobantes de pago. En el Perú, una parte importante de contribuyentes no aprovecha plenamente los beneficios de las deducciones tributarias por desconocimiento, desorganización documental o falta de sistemas digitales de apoyo.
+
+Si bien la normativa establece el registro electrónico de las boletas en la SUNAT, en la práctica muchas boletas físicas no llegan a cargarse. Aquellas no registradas deben declararse manualmente al cierre del ejercicio fiscal, lo que genera incertidumbre sobre el monto real de las deducciones acumuladas y, con frecuencia, pérdidas económicas por deducciones no declaradas oportunamente.
+
+A partir de experiencias personales y familiares, se ha identificado la dificultad de conservar boletas físicas y digitales en buen estado. La falta de sistematización documental impacta directamente en la economía de los contribuyentes, al limitar su capacidad de aprovechar los beneficios tributarios disponibles.
+
+En respuesta, un sistema automatizado basado en inteligencia artificial y visión computacional constituye una alternativa viable. Tecnologías como \textbf{PaddleOCR} permiten digitalizar la información contenida en documentos escaneados con alta precisión; el uso de un \textbf{ORM} con \textbf{SQLite} ofrece un entorno eficiente para almacenar y consultar datos estructurados de forma local; y una \textbf{arquitectura multiagente} facilita distribuir funciones en componentes autónomos y colaborativos, mejorando la escalabilidad y el mantenimiento.
+
+Este trabajo busca demostrar la viabilidad de un enfoque multiagente aplicado a la gestión automatizada de comprobantes tributarios, combinando técnicas de reconocimiento de texto, procesamiento estructurado de datos y generación de reportes dinámicos.
+
+\section{Objetivos}
+
+Diseñar e implementar una arquitectura conversacional multiagente que automatice la captura, validación y análisis de comprobantes tributarios deducibles en el Perú, comparando el desempeño de distintos frameworks agentic (LangGraph y Agno), motores de extracción de texto (OCR local con modelos en Ollama frente a PaddleOCR y PyMuPDF) y modelos de lenguaje con diferentes cantidades de parámetros, en el contexto de un aplicativo móvil para usuarios finales.
+
+\subsection*{Objetivos específicos del sistema}
+\begin{itemize}
+    \item Diseñar una arquitectura multiagente que combine agentes secuenciales para la coordinacion de la ingesta y validación, y agentes ReAct para la consulta del usuario.
+    \item Diseñar e implementar una base de datos local con PostgreSQL, utilizando un ORM para la gestión eficientes de los datos estructurados extraidos.
+    \item Definir y generarar datasets sintéticos y reales etiquetados para métricas cuantitativas.
+    \item Evaluar motores de extracción de texto (OCR local con Ollama frente a PaddleOCR y PyMuPDF).
+    \item Analizar el rendimiento de los modelos de lengauje de distinto tamaño para una aplicación móvil.
+\end{itemize}
+
+\subsection*{Objetivos académicos}
+\begin{itemize}
+    \item Aplicar conocimientos de arquitectura multiagente, ORM y bases de datos relacionales en un contexto real.
+    \item Analizar el rendimiento de los motores de extracción de texto y modelos de lenguaje en un contexto real.
+\end{itemize}
+
+\section{Estructura del seminario}
+
+Con el propósito de brindar una visión global del contenido, a continuación se presenta la estructura de los capítulos que componen la tesis:
+
+\begin{itemize}
+    \item \textbf{Introducción:} Contexto, problemática, motivación y objetivos del proyecto, además de una descripción general de la propuesta.
+    \item \textbf{Estado del Arte:} Revisión de investigaciones y sistemas previos relacionados con el reconocimiento de texto, la automatización de procesos tributarios y las arquitecturas multiagente.
+    \item \textbf{Marco Teórico:} Fundamentos del reconocimiento óptico de caracteres (OCR), arquitecturas multiagente, ORM y bases de datos relacionales.
+    \item \textbf{Metodología y Herramientas:} Arquitectura del sistema, fases de desarrollo, tecnologías empleadas y aspectos éticos vinculados al manejo de datos personales.
+    \item \textbf{Resultados y discusión:} Presentación de resultados experimentales, incluyendo métricas de precisión y desempeño en el reconocimiento y la categorización de comprobantes reales.
+    \item \textbf{Conclusiones y Trabajo Futuro:} Principales hallazgos y posibles extensiones del sistema, como la integración con plataformas oficiales y el desarrollo de una interfaz web completa.
+\end{itemize}

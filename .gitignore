@@ -1,0 +1,49 @@
+# Común
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+.env
+.env.*
+
+# Interfaces y assets locales
+interfaces/*
+
+# Backend (Python / FastAPI / Agno)
+FinchatBackend/.venv/
+FinchatBackend/venv/
+FinchatBackend/env/
+FinchatBackend/__pycache__/
+FinchatBackend/**/*.pyc
+FinchatBackend/.pytest_cache/
+FinchatBackend/.mypy_cache/
+FinchatBackend/.ruff_cache/
+FinchatBackend/.coverage
+FinchatBackend/coverage.xml
+FinchatBackend/htmlcov/
+FinchatBackend/build/
+FinchatBackend/dist/
+FinchatBackend/*.egg-info/
+FinchatBackend/debug_*
+FinchatBackend/seed_goku_data.py
+FinchatBackend/app/data/**
+FinchatBackend/benchmark/data/**
+
+# Mobile (Expo / React Native)
+FinchatMobile/node_modules/
+FinchatMobile/.expo/
+FinchatMobile/.expo-shared/
+FinchatMobile/.turbo/
+FinchatMobile/dist/
+FinchatMobile/build/
+FinchatMobile/web-build/
+FinchatMobile/.metro-cache/
+FinchatMobile/.cache/
+FinchatMobile/npm-debug.log*
+FinchatMobile/yarn-debug.log*
+FinchatMobile/yarn-error.log*
+FinchatMobile/pnpm-debug.log*
+FinchatMobile/.env
+FinchatMobile/.env.*
+
