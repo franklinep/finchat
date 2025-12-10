@@ -1,24 +1,76 @@
-\chapter{Marco Teórico}
+\chapter{Marco teórico}
+\label{cap:marco_teorico}
 
-En este capítulo se presentan los fundamentos conceptuales y tecnológicos que sustentan el sistema propuesto para la gestión y análisis de comprobantes tributarios. Se abordan: (i) reconocimiento óptico de caracteres (OCR), (ii) sistemas de gestión de bases de datos y mapeo objeto–relacional (ORM), (iii) arquitectura basada en agentes (\textit{agentic AI}) y patrones de orquestación, y (iv) los criterios normativos de deducibilidad para personas naturales en el Perú.
+\section{Modelos de lenguaje de gran tamaño (LLM)}
 
-\section{Reconocimiento Óptico de Caracteres (OCR)}
-El \textbf{Reconocimiento Óptico de Caracteres (OCR)} convierte texto impreso o manuscrito en texto digital. Un flujo típico incluye: preprocesamiento (normalización, reducción de ruido y corrección de inclinación), segmentación, reconocimiento y postprocesamiento lingüístico. En este proyecto se emplea \textit{PaddleOCR} como módulo principal para digitalizar boletas e imágenes escaneadas, generando texto que luego se valida, clasifica y persiste.
+Los modelos de lenguaje de gran tamaño (LLM, por sus siglas en inglés) son modelos neurales entrenados sobre grandes corpus de texto con el objetivo de predecir la siguiente palabra en una secuencia. A partir de esta tarea, aprenden representaciones distribuidas de palabras, frases y documentos que les permiten realizar tareas como generación de texto, traducción, resumen, razonamiento y respuesta a preguntas.
 
-\section{Sistemas de Bases de Datos y ORM}
-Un \textbf{SGBD} relacional organiza datos en tablas con claves e integridad referencial. Para el MVP se utiliza \textbf{SQLite} (ligero y embebido) y para despliegue productivo \textbf{PostgreSQL}. El acceso se realiza con \textbf{SQLAlchemy}, que permite definir entidades de dominio y relaciones mediante clases, mejorando mantenibilidad y portabilidad.
+En el contexto de agentes conversacionales, los LLM no solo generan texto, sino que pueden utilizarse para controlar el flujo de una conversación, decidir qué herramientas invocar y combinar información de múltiples fuentes. El comportamiento de estos modelos se adapta mediante \textit{prompts} que describen el rol del agente, el formato esperado de salida y ejemplos de interacción, lo que resulta clave en esta tesis para obtener salidas estructuradas en formato JSON y para controlar el uso de herramientas.
 
-\section{Arquitectura basada en agentes y patrones de orquestación}
-El sistema adopta una \textbf{arquitectura multiagente} donde componentes autónomos cooperan (ingesta/OCR, validación, clasificación, consultas analíticas). En la ruta de consultas se aplica el esquema \textit{ReAct} (razonar–actuar–observar) para planificar, ejecutar herramientas (p.\,ej., consultas ORM) y verificar resultados antes de responder. Este patrón se emplea ampliamente para mejorar la planificación y reducir alucinaciones frente a enfoques de \textit{zero-shot} o \textit{chain-of-thought} puros.
+\section{Arquitecturas agentic y patrón ReAct}
 
-Para el \textbf{orquestador} se adopta el \emph{Patrón de Lógica Personalizada}, recomendado cuando el flujo de trabajo requiere \emph{ramas condicionales y control fino}, y no encaja en plantillas estándar como los patrones secuenciales o paralelos. Este patrón permite enrutar dinámicamente subtareas a subagentes especializados (p.\,ej., validador SUNAT, clasificador tributario, persistencia) y culminar con un agente de respuesta, asumiendo el costo de mayor complejidad de diseño y mantenimiento \cite{google-cloud-agentic-patterns}.
+\subsection{Agentes basados en LLM}
 
-La arquitectura se alinea con principios de \textit{Arquitectura Limpia} y separación de capas (dominio, aplicación, infraestructura e interfaz), lo que facilita la prueba de reglas tributarias, la idempotencia de la ingesta y la trazabilidad de extremo a extremo.
+Un agente basado en LLM puede definirse como un sistema que, apoyado en un modelo de lenguaje, percibe un contexto (mensaje del usuario, memoria, resultados de herramientas), decide una acción (responder, invocar una herramienta, delegar a otro agente), ejecuta dicha acción y actualiza su estado. El control del flujo puede ser implícito (mediante prompts) o explícito (mediante un framework que define estados, transiciones y memoria).
 
-\section{Normativa y criterios de deducibilidad en el Perú}
-Para personas naturales con rentas de cuarta o quinta categoría, la SUNAT reconoce una \textbf{deducción adicional global de hasta 3 UIT} (S/ 16\,050 para 2025), distribuida según el tipo de gasto. De acuerdo con la guía oficial, los porcentajes de deducción aplicables incluyen, entre otros: \emph{15\%} para \textit{restaurantes y hoteles}, \emph{30\%} para \textit{servicios profesionales} y \textit{alquiler de inmuebles}, y \emph{100\%} de \textit{aportaciones a EsSalud por trabajadores del hogar}, siempre dentro del tope de 3 UIT \cite{gobpe-gastos-deducibles}.
+\textcite{masterman2024landscape} describen múltiples patrones de diseño para agentes y arquitecturas multiagente, incluyendo agentes supervisores, equipos horizontales, flujos de planificación–ejecución–reflexión y agentes especialistas por herramienta. Estas arquitecturas permiten descomponer problemas complejos en tareas más pequeñas, asignadas a agentes especializados.
 
-Asimismo, para que el gasto sea deducible, la \textbf{identificación del contribuyente} (DNI o RUC) debe estar correctamente consignada en el comprobante y los establecimientos (p.\,ej., hoteles y restaurantes) deben cumplir condiciones formales específicas (estado habido, unica actividad principal, entre otros) \cite{sunat-consideraciones-deducibles}. Estas reglas informan el diseño del \emph{pipeline} (validaciones SUNAT, detección de duplicados, motor de reglas de deducibilidad) y la lógica de clasificación tributaria en la capa de dominio.
+\subsection{Patrón ReAct}
 
-\section{Síntesis}
-La combinación de OCR robusto, persistencia relacional con ORM y una orquestación \textit{agentic} con \emph{lógica personalizada} y ReAct permite: (i) separar tareas determinísticas (OCR, scraping, persistencia) del razonamiento del agente, (ii) auditar decisiones (clasificación/porcentajes) frente a reglas tributarias oficiales, y (iii) responder consultas analíticas de forma segura y trazable.
+El patrón ReAct, propuesto por \textcite{yao2023react}, integra de forma explícita el razonamiento en lenguaje natural con la ejecución de acciones (uso de herramientas). Un ciclo típico ReAct incluye:
+
+\begin{enumerate}
+  \item \textbf{Razonamiento}: el modelo elabora una explicación parcial o plan en lenguaje natural sobre cómo resolver la tarea.
+  \item \textbf{Acción}: el modelo decide invocar una herramienta concreta (por ejemplo, una API de búsqueda o una consulta SQL) con argumentos específicos.
+  \item \textbf{Observación}: el sistema recibe la respuesta de la herramienta y la añade al contexto.
+  \item \textbf{Iteración}: el modelo continúa razonando, incorporando la nueva información, hasta producir una respuesta final.
+\end{enumerate}
+
+Este patrón se utiliza en la tesis para el agente de consulta, que combina razonamiento sobre la intención del usuario con invocaciones a herramientas SQL deterministas. La salida final integra tanto la respuesta numérica o estructurada de la consulta como una explicación en lenguaje natural.
+
+\section{OCR y extracción de información}
+
+\subsection{Conceptos básicos de OCR}
+
+El reconocimiento óptico de caracteres (OCR) es la técnica mediante la cual se convierte texto presente en imágenes (escaneos, fotografías) en texto digital editable. Un pipeline de OCR típico incluye etapas de preprocesamiento de la imagen (binarización, corrección de inclinación), detección de regiones de texto y reconocimiento de caracteres.
+
+Las métricas comunes en OCR incluyen la tasa de error de caracteres (CER) y la tasa de error de palabras (WER). En el contexto de esta tesis, estas métricas no se miden directamente, pero influyen en la precisión de los campos extraídos por el agente de parseo.
+
+\subsection{PaddleOCR y PP-OCRv5}
+
+PaddleOCR es una librería de código abierto diseñada para proporcionar soluciones de OCR end-to-end en múltiples idiomas. Su familia de modelos PP-OCR se centra en ofrecer modelos ligeros con un buen equilibrio entre velocidad y precisión, adecuados para despliegue en producción y en dispositivos con recursos limitados \parencite{cui2025paddleocr30technicalreport}.
+
+PP-OCRv5 integra mejoras en los módulos de detección y reconocimiento, así como optimizaciones en la arquitectura de red y en las técnicas de entrenamiento, lo que permite procesar imágenes más rápidamente manteniendo una precisión competitiva. Estas características lo convierten en una opción adecuada para el tratamiento de boletas físicas en un sistema que prioriza la latencia.
+
+\subsection{Extracción de texto en PDF con PyMuPDF}
+
+En documentos PDF nativos, el texto suele estar almacenado como entidades de texto internas en el archivo, lo que permite extraerlo sin recurrir a OCR. PyMuPDF es una librería que ofrece funciones de lectura y manipulación de PDFs, incluyendo métodos de extracción de texto, imágenes y metadatos con alta eficiencia \parencite{pymupdf2025,artifex2025pymupdf}. Guías de rendimiento reportan que la extracción de texto con PyMuPDF es varias veces más rápida que otras librerías y órdenes de magnitud más rápida que el OCR completo en documentos extensos.
+
+En esta tesis se adopta una estrategia híbrida: se utiliza PyMuPDF para boletas electrónicas descargadas de la SUNAT y PP-OCRv5 solo cuando el comprobante está disponible únicamente como imagen.
+
+\section{Conceptos tributarios relevantes}
+
+\subsection{RUC, CIIU y condición del contribuyente}
+
+En el Perú, toda persona natural o jurídica que realiza actividades económicas formales posee un Registro Único de Contribuyentes (RUC). El RUC incluye información como el estado del contribuyente (por ejemplo, ACTIVO o BAJA) y la condición (HABIDO o NO HABIDO), así como una o más actividades económicas clasificadas mediante códigos CIIU.
+
+El estado y la condición del RUC constituyen insumos fundamentales para determinar si un comprobante de pago puede ser considerado deducible en términos tributarios: como regla simplificada, un emisor con RUC en estado ACTIVO y condición HABIDO se considera elegible para que sus comprobantes puedan sustentar gastos deducibles, mientras que ciertas combinaciones de estado o condición pueden conducir a la no deducibilidad.
+
+\subsection{Gastos deducibles y deducción adicional de 3 UIT}
+
+La normativa peruana establece que las personas naturales pueden deducir de la base imponible de su impuesto a la renta un conjunto de gastos personales hasta un límite dado, incluyendo una deducción adicional de hasta 3 UIT por consumos en rubros específicos como hoteles, restaurantes, alquiler de inmuebles, servicios profesionales y aportes a EsSalud por trabajadores del hogar \parencite{sunat2025gastos3uit}. Para que estos gastos sean deducibles, deben estar sustentados con comprobantes de pago electrónicos válidos y vinculados al contribuyente.
+
+En este trabajo se implementa una capa de reglas simplificadas que, combinada con la información proveniente de la consulta al RUC, permite marcar un comprobante como potencialmente deducible o no deducible, con fines informativos para la persona usuaria.
+
+\section{Métricas de evaluación}
+
+Las métricas utilizadas en los experimentos responden a la necesidad de evaluar tanto la calidad de la información extraída como la eficiencia de la arquitectura:
+
+\begin{itemize}
+  \item \textbf{Latencia}: se define como el tiempo transcurrido entre la recepción de la solicitud y la generación de la respuesta por parte del agente, medido en segundos. Es relevante para la experiencia de usuario, especialmente en la aplicación móvil.
+  \item \textbf{Tasa de éxito en el formato}: porcentaje de ejecuciones en las que el modelo produce una salida con formato válido (por ejemplo, JSON sintácticamente correcto) que puede ser procesada automáticamente por el sistema.
+  \item \textbf{Precisión de campos}: proporción de campos correctamente extraídos o inferidos respecto de la referencia (\textit{ground truth}) definida para cada caso, considerando campos como RUC, razón social, fechas y montos.
+  \item \textbf{Precisión de uso de herramientas}: proporción de casos en los que el agente selecciona la herramienta adecuada (por ejemplo, la consulta SQL correcta o la consulta de RUC) y completa sus argumentos de forma correcta.
+\end{itemize}
+
+Estas métricas se emplean en el Capítulo~\ref{cap:resultados} para comparar el desempeño de distintos modelos de lenguaje integrados en los agentes de parseo, validación y consulta.

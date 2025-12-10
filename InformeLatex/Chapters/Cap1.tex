@@ -1,60 +1,70 @@
 \chapter{Introducción}
+\label{cap:introduccion}
 
-En el contexto peruano, tanto los trabajadores independientes como quienes laboran en relación de dependencia pueden deducir determinados gastos de sus rentas de trabajo, reduciendo así su carga tributaria anual. De acuerdo con la normativa vigente de la Superintendencia Nacional de Aduanas y de Administración Tributaria (SUNAT), los principales gastos deducibles son:
+\section{Contexto y problemática}
+
+En el sistema tributario peruano, las personas naturales que perciben rentas de trabajo tienen derecho a deducir ciertos gastos personales hasta un tope anual, como la deducción adicional de 3 UIT para consumos específicos (hoteles, restaurantes, alquiler, servicios profesionales, entre otros), siempre que estos se encuentren debidamente sustentados con comprobantes de pago válidos. No obstante, en la práctica, la mayoría de contribuyentes no tiene visibilidad en tiempo real de cuánto ha acumulado en gastos deducibles ni de qué comprobantes cumplen efectivamente con las condiciones de la normativa vigente.
+
+La información relevante se encuentra dispersa en distintas fuentes: boletas electrónicas consultables en los portales de la SUNAT, comprobantes enviados por correo electrónico, archivos PDF descargados de las plataformas de los emisores y boletas físicas en papel que pueden no estar registradas oportunamente en los sistemas de la administración tributaria. Adicionalmente, estos documentos contienen datos sensibles (nombre completo, dirección, número de DNI o RUC, etc.), lo que plantea retos de privacidad cuando se evalúa el uso de servicios en la nube.
+
+En la actualidad, las personas suelen gestionar esta información mediante hojas de cálculo, plantillas manuales o aplicaciones financieras genéricas donde se requiere ingresar los datos de forma estructurada. No se dispone de herramientas que permitan registrar y consultar gastos en lenguaje natural, a partir de la subida de boletas electrónicas o fotos de boletas físicas, que a la vez integren validaciones básicas contra la información disponible públicamente en SUNAT. Esta brecha limita la capacidad de los contribuyentes para tomar decisiones informadas sobre su situación tributaria y su planificación financiera a lo largo del año.
+
+\section{Formulación del problema}
+
+El problema central se puede formular de la siguiente manera:
+
+\begin{quote}
+¿Cómo diseñar e implementar una arquitectura conversacional basada en agentes que permita a una persona natural registrar y consultar, en lenguaje natural, sus comprobantes de pago electrónicos y físicos, estimando en tiempo casi real su nivel de gasto deducible de manera segura y trazable, sin requerir conocimientos técnicos ni tributarios avanzados?
+\end{quote}
+
+Es importante resaltar que el sistema desarrollado no realiza la presentación automática de la declaración jurada anual de impuesto a la renta ni envía información a los sistemas de SUNAT con efectos legales. La propuesta se orienta a informar a la persona usuaria sobre la deducibilidad de sus comprobantes, con base en reglas simplificadas y en la información pública disponible, y a facilitar la gestión de sus gastos y ahorros. La arquitectura se diseña de forma que, en trabajos futuros, pueda extenderse hacia funciones más avanzadas, como la generación asistida de borradores de declaración anual.
+
+\section{Objetivo general}
+
+El objetivo general de la investigación es:
+
+\begin{quote}
+Diseñar e implementar una arquitectura conversacional multiagente que mejore la trazabilidad y comprensión de los gastos deducibles de personas naturales en el Perú, mediante la ingesta automatizada de comprobantes electrónicos y físicos, su validación tributaria básica contra datos públicos de la SUNAT y un agente de consulta en lenguaje natural integrado a una aplicación móvil.
+\end{quote}
+
+\section{Objetivos específicos}
+
+A partir del objetivo general se plantea la siguiente lista de objetivos específicos:
 
 \begin{enumerate}
-    \item \textbf{Hoteles y restaurantes:} 15\% del gasto efectuado.
-    \item \textbf{Servicios profesionales:} 30\% del gasto efectuado.
-    \item \textbf{Alquiler de inmuebles:} 30\% del gasto efectuado.
-    \item \textbf{Aportes a EsSalud por trabajadores del hogar:} 100\% del gasto efectuado.
+  \item Diseñar e implementar una arquitectura conversacional multiagente, basada en agentes secuenciales y en el patrón ReAct, que coordine la ingesta, validación y consulta de comprobantes de pago electrónicos y físicos.
+  \item Diseñar e implementar un modelo de datos relacional en PostgreSQL, desacoplado mediante el patrón de repositorios y un ORM, para almacenar comprobantes, resultados de OCR, validaciones SUNAT, clasificaciones tributarias y el historial de interacción con el sistema.
+  \item Construir conjuntos de datos de evaluación, combinando comprobantes sintéticos y comprobantes con RUC reales, que permitan medir cuantitativamente la precisión de extracción, validación y consulta de la arquitectura propuesta.
+  \item Desarrollar y evaluar un agente de consulta en lenguaje natural, basado en el patrón ReAct y en herramientas SQL deterministas, que permita a la persona usuaria consultar sus comprobantes, gastos deducibles y métricas financieras sin conocer el esquema de la base de datos.
+  \item Analizar comparativamente el desempeño de distintos modelos de lenguaje integrados en los agentes (por ejemplo, \texttt{llama3.1:8b}, \texttt{gemma3:12b}, \texttt{qwen3:4b}, \texttt{gpt-oss:20b}), en términos de precisión, latencia y robustez en las tareas de parseo, validación y consulta.
+  \item Implementar una aplicación móvil desarrollada con Expo/React Native que consuma los servicios del backend multiagente y permita a las personas usuarias registrar comprobantes, revisar su nivel de gasto deducible acumulado y realizar consultas en lenguaje natural.
 \end{enumerate}
 
-Estos beneficios constituyen una oportunidad para los contribuyentes que buscan optimizar su economía personal mediante una adecuada gestión de sus deducciones tributarias. No obstante, en la práctica, muchas personas desconocen cuáles de sus gastos son efectivamente deducibles o cuánto han acumulado a lo largo del año fiscal. Ello se debe, principalmente, a que no todas las boletas se registran de manera automática en la plataforma de la SUNAT—en especial las emitidas en formato físico—y a dificultades en la administración de comprobantes de pago, la heterogeneidad de formatos y los errores derivados del procesamiento manual de información.
+Cada objetivo específico se materializa en uno o varios módulos de software, experimentos o métricas cuantitativas que se presentan en los capítulos metodológicos y de resultados, y se retoman explícitamente en las conclusiones.
 
-Frente a esta problemática, el presente trabajo propone el diseño e implementación de un sistema experimental para la \textbf{gestión automatizada de boletas y comprobantes}, clasificándolos según las categorías establecidas por la SUNAT y las condiciones necesarias para que el gasto sea deducible. El sistema integrará tecnologías de \textit{Reconocimiento Óptico de Caracteres} (OCR) mediante \textbf{PaddleOCR}, junto con un modelo de base de datos local gestionado con un \textbf{ORM} (mapeo objeto–relacional) sobre \textbf{SQLite}. Asimismo, se adoptará una arquitectura \textbf{multiagente}, en la que agentes especializados colaboran para ejecutar tareas específicas, tales como la lectura, la clasificación y la explicación de los datos obtenidos.
+\section{Alcance y limitaciones}
 
-Adicionalmente, el sistema permitirá la generación automática de reportes, paneles de control y métricas de deducción, brindando al usuario una visión integral de sus gastos deducibles. De este modo, se busca facilitar el cumplimiento tributario y promover una mejor organización financiera personal.
-
-\section{Motivación}
-
-La motivación de este proyecto surge de una necesidad frecuente entre los contribuyentes: la ausencia de herramientas tecnológicas que automaticen y sistematicen la gestión de comprobantes de pago. En el Perú, una parte importante de contribuyentes no aprovecha plenamente los beneficios de las deducciones tributarias por desconocimiento, desorganización documental o falta de sistemas digitales de apoyo.
-
-Si bien la normativa establece el registro electrónico de las boletas en la SUNAT, en la práctica muchas boletas físicas no llegan a cargarse. Aquellas no registradas deben declararse manualmente al cierre del ejercicio fiscal, lo que genera incertidumbre sobre el monto real de las deducciones acumuladas y, con frecuencia, pérdidas económicas por deducciones no declaradas oportunamente.
-
-A partir de experiencias personales y familiares, se ha identificado la dificultad de conservar boletas físicas y digitales en buen estado. La falta de sistematización documental impacta directamente en la economía de los contribuyentes, al limitar su capacidad de aprovechar los beneficios tributarios disponibles.
-
-En respuesta, un sistema automatizado basado en inteligencia artificial y visión computacional constituye una alternativa viable. Tecnologías como \textbf{PaddleOCR} permiten digitalizar la información contenida en documentos escaneados con alta precisión; el uso de un \textbf{ORM} con \textbf{SQLite} ofrece un entorno eficiente para almacenar y consultar datos estructurados de forma local; y una \textbf{arquitectura multiagente} facilita distribuir funciones en componentes autónomos y colaborativos, mejorando la escalabilidad y el mantenimiento.
-
-Este trabajo busca demostrar la viabilidad de un enfoque multiagente aplicado a la gestión automatizada de comprobantes tributarios, combinando técnicas de reconocimiento de texto, procesamiento estructurado de datos y generación de reportes dinámicos.
-
-\section{Objetivos}
-
-Diseñar e implementar una arquitectura conversacional multiagente que automatice la captura, validación y análisis de comprobantes tributarios deducibles en el Perú, comparando el desempeño de distintos frameworks agentic (LangGraph y Agno), motores de extracción de texto (OCR local con modelos en Ollama frente a PaddleOCR y PyMuPDF) y modelos de lenguaje con diferentes cantidades de parámetros, en el contexto de un aplicativo móvil para usuarios finales.
-
-\subsection*{Objetivos específicos del sistema}
-\begin{itemize}
-    \item Diseñar una arquitectura multiagente que combine agentes secuenciales para la coordinacion de la ingesta y validación, y agentes ReAct para la consulta del usuario.
-    \item Diseñar e implementar una base de datos local con PostgreSQL, utilizando un ORM para la gestión eficientes de los datos estructurados extraidos.
-    \item Definir y generarar datasets sintéticos y reales etiquetados para métricas cuantitativas.
-    \item Evaluar motores de extracción de texto (OCR local con Ollama frente a PaddleOCR y PyMuPDF).
-    \item Analizar el rendimiento de los modelos de lengauje de distinto tamaño para una aplicación móvil.
-\end{itemize}
-
-\subsection*{Objetivos académicos}
-\begin{itemize}
-    \item Aplicar conocimientos de arquitectura multiagente, ORM y bases de datos relacionales en un contexto real.
-    \item Analizar el rendimiento de los motores de extracción de texto y modelos de lenguaje en un contexto real.
-\end{itemize}
-
-\section{Estructura del seminario}
-
-Con el propósito de brindar una visión global del contenido, a continuación se presenta la estructura de los capítulos que componen la tesis:
+La arquitectura propuesta se orienta a personas naturales que desean gestionar sus gastos deducibles asociados a boletas y facturas de consumo en el marco de la normativa tributaria peruana. El sistema permite:
 
 \begin{itemize}
-    \item \textbf{Introducción:} Contexto, problemática, motivación y objetivos del proyecto, además de una descripción general de la propuesta.
-    \item \textbf{Estado del Arte:} Revisión de investigaciones y sistemas previos relacionados con el reconocimiento de texto, la automatización de procesos tributarios y las arquitecturas multiagente.
-    \item \textbf{Marco Teórico:} Fundamentos del reconocimiento óptico de caracteres (OCR), arquitecturas multiagente, ORM y bases de datos relacionales.
-    \item \textbf{Metodología y Herramientas:} Arquitectura del sistema, fases de desarrollo, tecnologías empleadas y aspectos éticos vinculados al manejo de datos personales.
-    \item \textbf{Resultados y discusión:} Presentación de resultados experimentales, incluyendo métricas de precisión y desempeño en el reconocimiento y la categorización de comprobantes reales.
-    \item \textbf{Conclusiones y Trabajo Futuro:} Principales hallazgos y posibles extensiones del sistema, como la integración con plataformas oficiales y el desarrollo de una interfaz web completa.
+  \item Registrar comprobantes electrónicos descargados de la SUNAT u otros portales, así como boletas físicas escaneadas o fotografiadas.
+  \item Extraer información estructurada básica del comprobante (emisor, fecha de emisión, monto total, moneda, ítems).
+  \item Consultar información agregada (totales por categoría, emisor o periodo) y realizar consultas específicas en lenguaje natural a través de un agente de consulta.
+  \item Estimar, con base en reglas simplificadas, si un comprobante cumple condiciones mínimas de deducibilidad, considerando el estado y condición del RUC y un mapeo aproximado por CIIU.
 \end{itemize}
+
+El sistema no:
+
+\begin{itemize}
+  \item Realiza la presentación automática de declaraciones juradas ni envía información a la SUNAT.
+  \item Sustituye el criterio profesional de un contador o asesor tributario en casos complejos.
+  \item Garantiza la ausencia total de errores de OCR o inconsistencias en fuentes externas.
+\end{itemize}
+
+La evaluación experimental se realiza sobre un conjunto acotado de comprobantes sintéticos y casos reales controlados, por lo que los resultados deben interpretarse como evidencia inicial de viabilidad y no como validación exhaustiva frente a todos los escenarios posibles. La comparación con arquitecturas alternativas sin orquestación multiagente se deja como trabajo futuro.
+
+\section{Organización de la tesis}
+
+El documento se organiza en seis capítulos. En el Capítulo~\ref{cap:estado_arte} se presenta el estado del arte relacionado con arquitecturas multiagente basadas en modelos de lenguaje, técnicas de OCR para documentos tributarios y aplicaciones de inteligencia artificial en el ámbito tributario. El Capítulo~\ref{cap:metodologia} describe la metodología de investigación y de ingeniería seguida, así como la arquitectura propuesta, el modelo de datos y los componentes principales del sistema.
+
+En el Capítulo~\ref{cap:marco_teorico} se desarrolla el marco teórico que sustenta conceptos como modelos de lenguaje, agentes, patrón ReAct, OCR y métricas de evaluación. El Capítulo~\ref{cap:resultados} presenta los experimentos realizados y discute los resultados obtenidos para los agentes de parseo, validación SUNAT y consulta en lenguaje natural. Finalmente, el Capítulo~\ref{cap:conclusiones} expone las conclusiones de la investigación, las limitaciones identificadas y las líneas de trabajo futuro, incluyendo la posible extensión hacia la generación asistida de borradores de declaración anual y la gestión general de gastos y ahorros más allá del ámbito estrictamente tributario.

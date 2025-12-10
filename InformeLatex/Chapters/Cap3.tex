@@ -1,114 +1,189 @@
-\chapter{Metodología}
-\label{chap:metodologia}
+\chapter{Metodología y arquitectura propuesta}
+\label{cap:metodologia}
 
-Este capítulo describe el enfoque metodológico aplicado al diseño e implementación de la arquitectura conversacional multiagente para la gestión de comprobantes tributarios deducibles en el Perú. Se detalla el hardware y software empleado, la arquitectura técnica y de agentes, el flujo de API, los principios de diseño, el modelo de datos, los criterios de calidad y seguridad, así como el plan de evaluación y métricas.
+\section{Enfoque metodológico de la investigación}
 
-\section{Enfoque general}
-El sistema opera sobre dos rutas de procesamiento complementarias:
+La presente investigación se enmarca en una \textit{investigación aplicada} con enfoque de diseño de artefactos software. El objetivo principal es construir y validar una arquitectura multiagente que permita gestionar comprobantes de pago y estimar gastos deducibles de manera conversacional.
+
+Desde la perspectiva científica, se adopta un diseño cuasi-experimental: se construye el artefacto (sistema conversacional multiagente) y se evalúa su desempeño cuantitativo mediante métricas de precisión y latencia en tareas específicas (parseo, validación SUNAT y consulta). Los experimentos se realizan sobre un conjunto de comprobantes sintéticos y casos reales controlados, sin grupo de control basado en una arquitectura alternativa, dejando dicha comparación para trabajos futuros.
+
+Desde la perspectiva de ingeniería, se sigue un proceso incremental compuesto por las siguientes etapas:
+
 \begin{enumerate}
-  \item \textbf{Ruta de archivos (pipeline de ingesta):} flujo determinista e idempotente para recibir PDFs/imágenes, ejecutar OCR y parsing, validar RUC/condición, clasificar deducibilidad y persistir resultados. Implementado como \emph{workflow} de cinco agentes en Agno.
-  \item \textbf{Ruta de consultas (ReAct):} un agente conversacional planifica y ejecuta herramientas ORM para responder preguntas agregadas del usuario (filtros por RUC, fechas, montos, categoría, totales).
-\end{enumerate}
-La selección de ruta se basa en el tipo de solicitud (subida de archivos o mensaje de texto) y se ejecuta en un backend FastAPI que expone los endpoints \texttt{/comprobantes/subir} y \texttt{/comprobantes/consultar}.
-
-\section{Hardware utilizado}
-\begin{itemize}
-  \item \textbf{Procesador:} CPU Intel Core i7-12700KF 16 nucleos
-  \item \textbf{Memoria RAM:} 32 GB
-  \item \textbf{Tarjeta gráfica:} GPU RTX 4070 super 12 GB
-  \item \textbf{Dispositivo móvil de prueba:} Teléfono Android con 8 GB RAM
-
-\section{Software utilizado}
-\begin{itemize}
-  \item \textbf{Backend:} Python 3.11, FastAPI, Agno (agentes y workflows), SQLAlchemy ORM, PostgreSQL 16.
-  \item \textbf{OCR y PDF:} Pipeline 1 (modelo OCR local servido vía Ollama); Pipeline 2 (PaddleOCR para imágenes + PyMuPDF para PDFs nativos).
-  \item \textbf{LLMs:} modelos locales en Ollama de distintos tamaños (4B, 8B, 12B, 20B) para parsing y razonamiento; uso comparativo de tamaños para balancear latencia/calidad.
-  \item \textbf{Móvil:} Expo/React Native, \texttt{react-navigation}, \texttt{react-native-paper}; pantallas de login/registro, chat, carga de comprobantes y detalle de recibo.
-  \item \textbf{Herramientas auxiliares:} librerías de hashing (\texttt{sha256}) para deduplicación, validación de RUC/condición vía servicio SUNAT, almacenamiento temporal de blobs y manejo de sesiones de usuario.
-\end{itemize}
-
-\section{Arquitectura}
-\subsection{Agentes secuenciales (pipeline de ingesta)}
-El \emph{workflow} \texttt{IngestaWorkflow} coordina cinco agentes:
-\begin{enumerate}
-  \item \textbf{Agente Validador de Comprobante:} calcula \texttt{sha256}, detecta duplicados por hash y por combinación (usuario, emisor, serie, número).
-  \item \textbf{Agente Parseador:} ejecuta OCR según MIME o tipo de documento (\texttt{PyMuPDF} para PDF nativo; \texttt{PaddleOCR}/modelo local para imagen), invoca LLM local para estructurar campos y aplica \emph{fallback} heurístico con expresiones regulares.
-  \item \textbf{Agente Validador SUNAT:} consulta estado y condición del RUC, obtiene CIIU y aplica reglas básicas de deducibilidad.
-  \item \textbf{Agente Clasificador:} asigna categoría de gasto y porcentaje deducible según reglas SUNAT, registrando la versión de regla.
-  \item \textbf{Agente Persistencia:} usa un \emph{prompt} con \emph{few shots} para revisar el contexto (emisor, comprobante, detalle, validación, clasificación, hash y flags) y detectar inconsistencias suaves (totales que no cuadran, serie/número vacíos, RUC ausente, fechas fuera de rango). La decisión de persistir sigue siendo determinista: si las validaciones duras pasan, se ejecuta el \emph{upsert} idempotente mediante repositorios SQLAlchemy y se confirma con \texttt{commit}; de lo contrario, se aborta con \texttt{rollback}.
+  \item Definición de requisitos funcionales y no funcionales, incluyendo restricciones tributarias, de seguridad y de experiencia de usuario.
+  \item Diseño de la arquitectura general multiagente y del modelo de datos relacional.
+  \item Implementación de los módulos de ingesta, OCR, agentes, backend y aplicación móvil.
+  \item Diseño del protocolo experimental: construcción de datasets, definición de casos de prueba y métricas.
+  \item Ejecución de experimentos y análisis de resultados.
 \end{enumerate}
 
+\section{Arquitectura general del sistema}
 
-\subsection{Agente ReAct para consultas}
-Un agente Agno con \texttt{tool\_choice} forzado utiliza \emph{QueryToolkit} para:
-\begin{itemize}
-  \item Búsqueda de comprobantes con filtros (RUC, fechas, categoría, montos, límite de resultados).
-  \item Cálculo de totales y agregaciones (promedio, suma, conteo; agrupación opcional por categoría).
-  \item Búsqueda por emisor (RUC o nombre) y detalle de comprobantes asociados.
-\end{itemize}
-Las herramientas operan sobre el ORM, retornan JSON estructurado y el agente genera una respuesta auditada con los resultados.
+La arquitectura se organiza por funcionalidades (\textit{features}) y se compone de cuatro capas principales:
 
-\begin{figure}[h!]
-  \centering
-  \includegraphics[width=\textwidth]{Figures/Arquitectura.png}
-  \caption{Arquitectura general del sistema.}
-  \label{fig:arquitectura}
-\end{figure}
-
-
-\section{Flujo de la API}
 \begin{enumerate}
-  \item \textbf{Subida de comprobantes:} el cliente móvil envía archivos a \texttt{/comprobantes/subir}, se ejecuta el pipeline de cinco pasos y se retorna: ID, hash, bandera de duplicado, campos parseados, validación SUNAT y clasificación.
-  \item \textbf{Consultas:} el cliente envía texto a \texttt{/comprobantes/consultar}; el agente ReAct traduce la intención a filtros ORM, ejecuta las herramientas y retorna respuesta en lenguaje natural más datos estructurados.
+  \item \textbf{Capa de presentación}: aplicación móvil desarrollada con Expo/React Native, que expone interfaz de registro de comprobantes, vista de historial y chat con el asistente conversacional.
+  \item \textbf{Capa de orquestación conversacional}: backend FastAPI que integra Agno (AgentOS) para definir y ejecutar agentes secuenciales y agentes basados en ReAct.
+  \item \textbf{Capa de procesamiento de documentos}: módulo de OCR y extracción, que utiliza PyMuPDF para PDFs nativos y PP-OCRv5 para imágenes de boletas físicas.
+  \item \textbf{Capa de persistencia}: base de datos PostgreSQL, accedida a través de repositorios que encapsulan el ORM y exponen una API orientada al dominio.
 \end{enumerate}
 
-\begin{figure}[h!]
+En el contexto de Agno, el flujo de trabajo de ingesta se modela como un \textit{workflow} secuencial, mientras que el agente de consulta se implementa mediante el patrón ReAct, combinando razonamiento en lenguaje natural y llamadas a herramientas SQL deterministas.
+
+En la tesis se recomienda incluir un diagrama de componentes que represente estas capas y su interacción, por ejemplo:
+
+\begin{figure}[H]
   \centering
-  \includegraphics[width=\textwidth]{Figures/api.png}
-  \caption{Flujo de la API.}
-  \label{fig:flujoapi}
+  \includegraphics[width=0.75\textwidth]{Figures/arquitectura_general.png}
+  \caption{Arquitectura general del sistema conversacional multiagente.}
+  \label{fig:arquitectura_general}
 \end{figure}
 
-\section{Patrones y principios de diseño}
+\section{Arquitectura multiagente con Agno}
+
+\subsection{Uso de Agno y justificación frente a LangGraph}
+
+En la implementación se utiliza Agno como framework principal para la definición y ejecución de agentes. Agno provee un AgentOS que se integra de forma nativa con FastAPI, exponiendo endpoints para interactuar con agentes, gestionar sesiones, memoria y herramientas \parencite{agno2025framework}. Esta integración permite mantener una única aplicación backend coherente, donde los agentes conviven con el resto de endpoints de negocio.
+
+LangGraph ofrece una abstracción basada en grafos para modelar aplicaciones con múltiples agentes y flujos complejos de decisión \parencite{langgraph2025graphapi}. Sin embargo, el flujo de ingesta y validación de comprobantes en este trabajo es esencialmente lineal y determinista: validar formato de archivo, aplicar OCR o extracción de texto, parsear, validar en SUNAT, clasificar y persistir. La complejidad adicional de un grafo de nodos y edges no se considera necesaria en esta etapa, y se prefiere una solución con flujos secuenciales explícitos y mayor cercanía a la lógica del dominio.
+
+En síntesis, se elige Agno porque:
+
 \begin{itemize}
-  \item \textbf{Arquitectura por funcionalidades (features):} agrupación por contexto de dominio, como autenticación y agentes.
-  \item \textbf{Inversión de dependencias:} Los repositorios abstraen el ORM, mientras que los agentes consumiran las interfaces de de estos repositorios, evitando dependencia directa con el ORM.
-  \item \textbf{Workflows en Agno:} Los workflows permiten crear flujos de agentes deterministas y controlados. Cada agente maneja una tarea especifica pesada, las salidas de cada agente son pasadas como argumentos al siguiente.
+  \item Permite definir \textit{workflows} secuenciales y equipos de agentes con bajo coste de configuración.
+  \item Se integra de manera directa con FastAPI, facilitando la exposición de endpoints y el uso de middlewares de autenticación.
+  \item Ofrece un modelo de ejecución \textit{private by design}, donde los agentes y sus datos corren íntegramente en la infraestructura controlada por el backend, protegiendo la información tributaria sensible.
 \end{itemize}
 
-\section{Diseño de la base de datos y persistencia}
-El esquema relacional incluye:
-\begin{itemize}
-  \item \texttt{usuario} (cuentas), \texttt{emisor} (RUC, razón social, CIIU, estado/condición).
-  \item \texttt{comprobante} (tipo, serie, número, fecha, monto, moneda, origen, hash, estado, deducible, duplicado; FKs a usuario y emisor; unicidad por (usuario, emisor, serie, número) y por hash).
-  \item \texttt{detalle\_comprobante} (ítems y montos), \texttt{validacion} (estado/condición RUC, CIIU, coincidencia de nombre, reglas), \texttt{clasificacion} (categoría, porcentaje, versión de regla).
-  \item \texttt{ocr\_pagina} (texto por página y confianza), \texttt{estado\_trabajo} (seguimiento de trabajos), \texttt{historial\_chat} (mensajes de conversación).
-\end{itemize}
+\subsection{Agentes del workflow de ingesta}
 
-\begin{figure}[h!]
+El flujo de ingesta de comprobantes se implementa como una secuencia de agentes especializados:
+
+\begin{enumerate}
+  \item \textbf{Agente validador de comprobante}: verifica que el archivo subido sea un comprobante válido (tipo de archivo, número de páginas, tamaño, etc.) y genera un identificador de trabajo.
+  \item \textbf{Agente de OCR y parseo}: aplica PyMuPDF o PP-OCRv5 según el tipo de documento, y luego utiliza un modelo de lenguaje para extraer un JSON estructurado con los campos del comprobante.
+  \item \textbf{Agente validador SUNAT}: consulta el RUC del emisor mediante una herramienta externa (\texttt{consultar\_ruc}) y aplica reglas de deducibilidad basadas en el estado y condición del contribuyente y el código CIIU.
+  \item \textbf{Agente clasificador}: asigna una categoría de gasto y un porcentaje de deducción aproximado en función de la normativa vigente y del CIIU detectado.
+  \item \textbf{Agente de persistencia}: utiliza repositorios para almacenar comprobante, detalles, resultados de OCR, validaciones y clasificación en la base de datos.
+\end{enumerate}
+
+Estos agentes se conectan a través de un contexto compartido que encapsula el estado del trabajo de ingesta (identificador de usuario, comprobante, texto, resultados intermedios y errores). La secuencialidad favorece la trazabilidad, ya que cada etapa puede registrarse y auditarse por separado.
+
+Para documentar este flujo, se recomienda incluir un diagrama de actividades o de flujo de procesos similar a:
+
+\begin{figure}[H]
   \centering
-  \includegraphics[width=\textwidth]{Figures/DB.png}
-  \caption{Esquema relacional de la base de datos.}
-  \label{fig:bd}
+  \includegraphics[width=0.75\textwidth]{Figures/flujo_ingesta.png}
+  \caption{Flujo de trabajo de ingesta y validación de comprobantes.}
+  \label{fig:flujo_ingesta}
 \end{figure}
 
-\section{Calidad, seguridad y cumplimiento}
+\subsection{Agente de consulta basado en ReAct}
+
+El agente de consulta se implementa siguiendo el patrón ReAct \parencite{yao2023react}. En lugar de utilizar un esquema de Recuperación Aumentada (RAG) sobre embeddings, el agente trabaja con un conjunto de herramientas SQL deterministas que encapsulan consultas frecuentes sobre la base de datos, tales como:
+
 \begin{itemize}
-  \item \textbf{Privacidad:} uso de modelos locales en Ollama para evitar exponer boletas a servicios externos.
-  \item \textbf{Seguridad:} autenticación con middleware JWT, cifrado en tránsito y manejo de sesiones por usuario.
-  \item \textbf{Confiabilidad:} se valida la duplicidad de los comprobantes antes de procesarlos y se ejecuta un rollback en caso de fallos.
+  \item Cálculo de montos totales por categoría y periodo.
+  \item Listado de comprobantes por emisor o rango de fechas.
+  \item Consultas sobre el porcentaje de deducción acumulado frente al tope de 3 UIT.
 \end{itemize}
 
-\section{Plan de evaluación y métricas}
+Dado un mensaje en lenguaje natural, el agente razona sobre la intención de la persona usuaria, selecciona la herramienta SQL apropiada y completa sus parámetros (por ejemplo, rango de fechas, categoría o emisor) en función del contenido de la consulta. El resultado de la herramienta se incorpora al contexto y el agente genera una respuesta final en lenguaje natural. Este enfoque evita complejidades asociadas al vectorizado del contenido y a la gestión de corpus extensos, aprovechando que los datos de interés se encuentran estructurados en la base de datos.
+
+\section{Procesamiento de documentos: PyMuPDF y PP-OCRv5}
+
+\subsection{Extracción de texto en boletas electrónicas con PyMuPDF}
+
+Las boletas electrónicas descargadas de SUNAT comparten un formato PDF nativo en el que el texto se encuentra embebido de forma estructurada. Para este tipo de documentos, se utiliza PyMuPDF como motor de extracción, lo que permite recuperar el texto con alta velocidad y sin introducir errores de reconocimiento óptico de caracteres \parencite{pymupdf2025,artifex2025pymupdf}. Diversas evaluaciones independientes reportan que la extracción nativa con PyMuPDF es significativamente más rápida que métodos basados en OCR y que es adecuada para escenarios de alto volumen y baja latencia.
+
+En el sistema propuesto, PyMuPDF se emplea como primera opción cuando se detecta que el PDF contiene texto embebido. Solo en caso de que la extracción falle o devuelva texto insuficiente se considera la posibilidad de aplicar OCR como respaldo. Esta estrategia reduce de manera importante el tiempo de procesamiento de boletas electrónicas y minimiza la propagación de errores de OCR hacia las etapas posteriores.
+
+\subsection{OCR en boletas físicas con PP-OCRv5}
+
+Para boletas físicas escaneadas o fotografiadas, se integra PP-OCRv5 como motor de OCR. Los modelos PP-OCRv5 se caracterizan por su tamaño reducido y por estar optimizados para despliegue en dispositivos y escenarios de producción donde la latencia es crítica \parencite{cui2025paddleocr30technicalreport}. La combinación de un detector de texto ligero con un reconocedor eficiente permite procesar imágenes de comprobantes con precisión suficiente para extraer campos como RUC, razón social, fecha y montos.
+
+Se descartan, para este trabajo, modelos más pesados como PP-StructureV3 y PaddleOCR-VL, que se orientan a tareas de comprensión estructural o multimodal más complejas. Dado que las boletas de consumo presentan estructuras relativamente simples y que la prioridad es la velocidad, PP-OCRv5 ofrece un equilibrio adecuado entre rendimiento y consumo de recursos.
+
+\section{Modelo de datos y patrón de repositorios}
+
+\subsection{Modelo relacional en PostgreSQL}
+
+El sistema utiliza PostgreSQL como gestor de base de datos relacional. El modelo de datos se centra en las siguientes entidades:
+
 \begin{itemize}
-  \item \textbf{OCR:} exactitud por campo (RUC, razón social, serie, número, fecha, monto e items encontrados), CER/WER y confianza promedio; robustez ante distintas calidades de imagen.
-  \item \textbf{Pipeline:} latencia extremo a extremo y \emph{throughput}; tasa de deduplicación efectiva.
-  \item \textbf{LLMs:} tiempo de respuesta y consumo de GPU/RAM para tamaños 8B/12B/20B en tareas de parsing y consulta; calidad percibida de la respuesta conversacional.
-  \item \textbf{Datos de prueba:} mezcla de comprobantes reales y sintéticos etiquetados; partición para evaluación; scripts de generación controlada para estrés de formatos.
+  \item \textbf{Usuario}: almacena información básica de la persona usuaria y sus credenciales.
+  \item \textbf{Emisor}: representa al contribuyente que emite el comprobante (RUC, razón social, nombre comercial, CIIU, estado y condición del RUC).
+  \item \textbf{Comprobante}: contiene los datos principales del comprobante (tipo, serie, número, fecha, monto, moneda, origen, hashes de archivo, estado de procesamiento, flags de deducibilidad y duplicado).
+  \item \textbf{Detalle\_comprobante}: almacena los ítems individuales del comprobante.
+  \item \textbf{Validación}: registra los resultados de la consulta a SUNAT (estado y condición del RUC, CIIU detectado, coincidencia de nombres y regla de deducibilidad).
+  \item \textbf{Clasificación}: guarda la categoría de gasto y el porcentaje de deducción asociado.
+  \item \textbf{OCR\_pagina}: conserva el texto y una medida de confianza promedio para cada página OCR.
+  \item \textbf{Estado\_trabajo}: gestiona el estado de los trabajos de ingesta o consulta.
+  \item \textbf{Historial\_chat}: registra los mensajes intercambiados en la interfaz conversacional.
 \end{itemize}
 
-\section{Riesgos y mitigaciones}
+En la tesis se recomienda incluir un diagrama entidad–relación que represente estas tablas y sus relaciones, por ejemplo:
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{Figures/modelo_datos.png}
+  \caption{Modelo entidad–relación de la base de datos del sistema.}
+  \label{fig:modelo_datos}
+\end{figure}
+
+\subsection{Patrón de repositorios e inversión de dependencias}
+
+Para desacoplar la lógica de negocio del ORM utilizado, se adopta el patrón de repositorios. Cada agregado principal (por ejemplo, \textit{Comprobante}, \textit{Emisor}, \textit{Usuario}) cuenta con una interfaz de repositorio que define operaciones orientadas al dominio (registrar un comprobante, buscar comprobantes por usuario y periodo, actualizar el resultado de validación, etc.). La implementación concreta de estas interfaces se realiza mediante el ORM, pero los agentes y servicios dependen únicamente de las abstracciones.
+
+Este enfoque ofrece varias ventajas:
+
 \begin{itemize}
-  \item \textbf{Variabilidad de imágenes:} preprocesamiento (normalización, reducción de ruido, realce de contraste) y retroalimentación al usuario cuando la confianza OCR es baja.
-  \item \textbf{Picos de carga:} colas y lotes internos para el procesamiento paralelo de archivos PDFs e imágenes.
+  \item Facilita la prueba unitaria de la lógica de negocio, sustituyendo repositorios reales por dobles de prueba.
+  \item Permite cambiar el ORM o incluso la tecnología de persistencia en el futuro sin modificar el código de los agentes.
+  \item Expone operaciones semánticamente significativas, alineadas con el dominio tributario, en lugar de consultas SQL dispersas en el código.
 \end{itemize}
+
+\section{Backend y endpoints expuestos}
+
+El backend se implementa con FastAPI y expone los siguientes endpoints principales:
+
+\begin{itemize}
+  \item \texttt{POST /api/v1/auth/register}: registra un nuevo usuario en el sistema, almacenando correo electrónico y contraseña en forma de hash.
+  \item \texttt{POST /api/v1/auth/login}: autentica a la persona usuaria y entrega un token de acceso para invocar los demás endpoints.
+  \item \texttt{POST /api/v1/comprobantes/subir}: recibe un comprobante en formato archivo (PDF o imagen) y dispara el workflow de ingesta, que ejecuta secuencialmente los agentes de validación de comprobante, OCR/parseo, validación SUNAT, clasificación y persistencia.
+  \item \texttt{POST /api/v1/comprobantes/consultar}: recibe una consulta en lenguaje natural y delega al agente de consulta, el cual selecciona y ejecuta la herramienta SQL adecuada y devuelve una respuesta estructurada y una explicación en lenguaje natural.
+\end{itemize}
+
+Todos estos endpoints requieren autenticación y asocian la información procesada al usuario autenticado, garantizando aislamiento entre cuentas. La lógica de negocio se implementa en servicios y agentes, mientras que los controladores HTTP se limitan a gestionar validación básica de entrada, autenticación y manejo de errores.
+
+\section{Aplicación móvil con Expo}
+
+La capa de presentación se implementa como una aplicación móvil desarrollada con Expo sobre React Native. Expo provee un flujo administrado para construir aplicaciones multiplataforma (Android e iOS) desde una base de código única, con herramientas integradas para compilación en la nube, manejo de activos, notificaciones y actualizaciones OTA \parencite{expo2025ota,expo2025whyexpo}. Esto permite:
+
+\begin{itemize}
+  \item Reducir el tiempo de desarrollo y pruebas, ya que la mayoría de los cambios se concentran en el código JavaScript/TypeScript.
+  \item Desplegar correcciones menores y mejoras en la interfaz mediante actualizaciones OTA, sin necesidad de pasar por todo el ciclo de revisión de las tiendas de aplicaciones para cada cambio.
+  \item Integrar de manera sencilla la comunicación con el backend FastAPI, autenticación y almacenamiento local de sesiones.
+\end{itemize}
+
+La aplicación móvil implementa pantallas para el registro y autenticación de usuarios, la subida de comprobantes (seleccionando archivos o capturando fotografías) y un módulo de chat donde la persona usuaria puede realizar consultas en lenguaje natural sobre sus gastos y deducciones acumuladas.
+
+\section{Conjunto de evaluación y métricas}
+
+Para evaluar empíricamente el desempeño de la arquitectura propuesta se definen tres experimentos principales, cada uno alineado con un objetivo específico:
+
+\begin{enumerate}
+  \item \textbf{Evaluación del agente de parseo}: se construye un conjunto de 20 comprobantes sintéticos, en formato JSON, que contienen texto OCR simulado con variaciones en la forma de referirse al cliente y al emisor, así como en la estructura de los ítems. Se mide la latencia promedio de cada modelo, la tasa de éxito en la generación de JSON válido y la precisión en la extracción de campos clave.
+  \item \textbf{Evaluación del agente validador SUNAT}: se diseñan 5 casos de prueba con RUC reales que cubren combinaciones de estado y condición del contribuyente, así como diferentes actividades económicas. Se evalúa la capacidad de los modelos para invocar correctamente la herramienta de consulta de RUC y para extraer campos como estado, condición y código CIIU.
+  \item \textbf{Evaluación del agente de consulta}: se definen 4 consultas de prueba con diferentes niveles de complejidad (cálculo de totales, filtrado por fechas, búsqueda por emisor e inferencia de fechas relativas), y se mide la precisión en la selección de la herramienta SQL adecuada, la precisión en el llenado de argumentos y la latencia.
+\end{enumerate}
+
+Las métricas seleccionadas son:
+
+\begin{itemize}
+  \item \textbf{Latencia}: tiempo, en segundos, entre la recepción de la solicitud y la producción de la respuesta del agente.
+  \item \textbf{Tasa de éxito}: proporción de ejecuciones en las que el formato de salida del agente es válido y procesable por las etapas siguientes (por ejemplo, JSON sintácticamente correcto).
+  \item \textbf{Precisión de campos}: fracción de campos correctamente extraídos o inferidos respecto de la \textit{ground truth} definida para cada caso de prueba.
+\end{itemize}
+
+Los resultados de estos experimentos se presentan y discuten en el Capítulo~\ref{cap:resultados}.

@@ -1,6 +1,101 @@
 \chapter{Resultados y discusión}
 \label{cap:resultados}
 
-Diseñamos un sistema conversacional multiagente para automatizar la captura, validación y clasificación de comprobantes deducibles en el contexto peruano. La solución integra lectura de PDFs nativos con PyMuPDF y OCR para escaneos con PaddleOCR, aplica reglas tributarias versionadas y valida contra fuentes de SUNAT, todo orquestado bajo principios de Arquitectura Limpia/DDD que separan claramente dominio, aplicación e infraestructura. El modelo de datos preserva evidencia (texto OCR, archivos, huellas) y asegura idempotencia mediante claves naturales y SHA-256, habilitando trazabilidad y auditoría.
+En el presente capítulo se exponen los resultados obtenidos tras la evaluación experimental de los agentes desarrollados. Se llevaron a cabo pruebas de rendimiento (\textit{benchmarks}) para medir la precisión, latencia y robustez de los modelos de lenguaje seleccionados (\texttt{llama3.1:8b}, \texttt{gemma3:12b}, \texttt{qwen3:4b} y \texttt{gpt-oss:20b}) en tres tareas críticas: la extracción estructurada de información (Parseo), la validación de reglas de negocio con herramientas externas (Validador SUNAT) y la interpretación de consultas en lenguaje natural (Agente de Consulta basado en ReAct y herramientas SQL).\n\n\section{Evaluación de la Extracción de Texto (OCR)}\n\nEl primer paso en el pipeline de ingesta es la digitalización de los comprobantes físicos mediante un motor de Reconocimiento Óptico de Caracteres (OCR). Para esta tarea se utilizó el modelo \texttt{PP-OCRv5} de PaddleOCR. Se evaluó su rendimiento en un conjunto de 5 boletas de venta físicas con distintas calidades de imagen, formatos y niveles de ruido.\n\nLa Tabla~\ref{tab:benchmark_ocr} muestra el tiempo de procesamiento y la confianza promedio reportada por el motor para cada imagen.\n\n\begin{table}[H]\n  \centering\n  \small\n  \begin{tabular}{lcc}\n    \toprule\n    \textbf{Imagen} & \textbf{Tiempo de Extracción (s)} & \textbf{Confianza Promedio} \\\n    \midrule\n    \texttt{img1.jpg} & 6.60 & 0.9054 \\\n    \texttt{img2.jpg} & 2.23 & 0.9245 \\\n    \texttt{img3.jpg} & 1.53 & 0.8494 \\\n    \texttt{img4.jpg} & 2.35 & 0.9274 \\\n    \texttt{img5.jpg} & 1.73 & 0.9371 \\\n    \midrule\n    \textbf{Promedio} & \textbf{2.89} & \textbf{0.9088} \\\n    \bottomrule\n  \end{tabular}\n  \caption{Resultados del benchmark de extracción de texto con OCR. Se observa una variabilidad en el tiempo de extracción, influenciada por la complejidad y resolución de cada imagen. La confianza promedio se mantiene consistentemente alta.}\n  \label{tab:benchmark_ocr}\n\end{table}\n\nEl texto extraído, aunque con algunos errores de reconocimiento, demostró ser suficientemente íntegro para que el agente de parseo (evaluado en la siguiente sección) pudiera extraer la información estructurada de manera efectiva.\n\n\section{Evaluación del agente de parseo (extracción estructurada)}
 
-Metodológicamente, seguiremos un enfoque incremental-iterativo: (1) definición de requerimientos y criterios de éxito (exactitud OCR, concordancia de clasificación, latencia, cobertura de validaciones); (2) diseño de la arquitectura agentic con un pipeline determinístico de ingesta y una ruta de consultas; (3) implementación del MVP con SQLAlchemy/SQLite y camino de migración a PostgreSQL; (4) pruebas unitarias y de integración centradas en idempotencia, deduplicación y validación contra casos reales; y (5) evaluación con métricas objetivas y registro exhaustivo para análisis posterior. Este proceso permitira ajustar decisiones tecnológicas con evidencia (por ejemplo, selección OCR por tipo de documento) y establecer una base sólida para el escalamiento y el endurecimiento futuro del sistema.
+El objetivo de esta evaluación fue determinar la capacidad de los modelos para extraer información estructurada en formato JSON a partir de texto crudo proveniente de un proceso OCR. Se utilizó un conjunto de datos sintético compuesto por 20 comprobantes de pago, empleando una estrategia de \textit{few-shot prompting} para guiar la generación.
+
+La Tabla~\ref{tab:benchmark_parseo} resume los resultados obtenidos en términos de latencia promedio, tasa de éxito en la generación de JSON válido y precisión en la extracción de campos.
+
+\begin{table}[H]
+  \centering
+  \small
+  \begin{tabular}{lccc}
+    \toprule
+    \textbf{Modelo} & \textbf{Latencia Promedio (s)} & \textbf{Tasa de Éxito (\%)} & \textbf{Precisión (Campos)} \\
+    \midrule
+    \texttt{llama3.1:8b} & \textbf{6.69} & \textbf{100\%} & \textbf{1.00} \\
+    \texttt{gemma3:12b} & 12.32 & 100\% & 1.00 \\
+    \texttt{qwen3:4b} & 5.59 & 0\% & 0.00 (Error JSON) \\
+    \texttt{gpt-oss:20b} & 12.77 & 0\% & 0.00 (Error JSON) \\
+    \bottomrule
+  \end{tabular}
+  \caption{Resultados del benchmark de parseo. Se observa que \texttt{llama3.1:8b} ofrece el mejor equilibrio entre velocidad y exactitud. Por el contrario, \texttt{qwen3:4b} y \texttt{gpt-oss:20b} presentaron dificultades sistemáticas para adherirse al formato JSON requerido.}
+  \label{tab:benchmark_parseo}
+\end{table}
+
+\section{Evaluación del agente validador SUNAT}
+
+Esta prueba midió la capacidad de los modelos para interactuar con herramientas externas (\textit{tool use}) y aplicar lógica deductiva. La tarea consistió en validar la deducibilidad de gastos consultando el estado de RUCs reales mediante la herramienta \texttt{consultar\_ruc}. Se emplearon 5 casos de prueba diseñados para evaluar tanto la invocación correcta de la herramienta como la interpretación de la respuesta.
+
+Los resultados, detallados en la Tabla~\ref{tab:benchmark_validador}, muestran el desempeño en latencia, precisión en el uso de la herramienta y exactitud en la extracción de datos clave como el estado del contribuyente y el código CIIU.
+
+\begin{table}[H]
+  \centering
+  \small
+  \begin{tabular}{lcccc}
+    \toprule
+    \textbf{Modelo} & \textbf{Latencia (s)} & \textbf{Uso de Tool} & \textbf{Precisión Estado} & \textbf{Precisión CIIU} \\
+    \midrule
+    \texttt{llama3.1:8b} & 2.49 & 100\% & 100\% & 80\% \\
+    \texttt{gemma3:12b} & 4.36 & 100\% & 100\% & 20\% \\
+    \texttt{qwen3:4b} & 14.27 & 100\% & 100\% & 100\% \\
+    \bottomrule
+  \end{tabular}
+  \caption{Nuevos resultados del benchmark del validador SUNAT. Se observa que \texttt{qwen3:4b} sigue siendo el más preciso en la extracción del CIIU, aunque con la mayor latencia. \texttt{llama3.1:8b} ofrece un buen equilibrio, mientras que \texttt{gemma3:12b} muestra dificultades en la extracción de detalles específicos.}
+  \label{tab:benchmark_validador}
+\end{table}
+
+
+\section{Evaluación del agente de consulta (ReAct + herramientas SQL)}
+
+Se analizó el desempeño del agente de consulta, responsable de interpretar preguntas en lenguaje natural y seleccionar la herramienta adecuada (consultas SQL predefinidas o filtros) para responder. Se diseñaron 4 consultas de prueba con variados niveles de complejidad, incluyendo cálculos de totales, filtrado por fechas y búsqueda por emisor, así como la interpretación de fechas relativas.
+
+La Tabla~\ref{tab:benchmark_consulta} presenta la latencia y la precisión tanto en la selección de la herramienta como en la extracción de sus argumentos.
+
+\begin{table}[H]
+  \centering
+  \small
+  \begin{tabular}{lccc}
+    \toprule
+    \textbf{Modelo} & \textbf{Latencia (s)} & \textbf{Precisión Selección Tool} & \textbf{Precisión Argumentos} \\
+    \midrule
+    \texttt{qwen3:4b} & 32.96 & \textbf{100\%} & \textbf{100\%} \\
+    \texttt{llama3.1:8b} & 3.02 & 75\% & 50\% \\
+    \texttt{gemma3:12b} & 0.19 & 0\% (No soporta Tools) & 0\% (No soporta Tools) \\
+    \bottomrule
+  \end{tabular}
+  \caption{Nuevos resultados del agente de consulta. \texttt{qwen3:4b} mantiene un rendimiento perfecto. \texttt{llama3.1:8b} muestra una degradación en la extracción de argumentos. \texttt{gemma3:12b} confirma su incompatibilidad con la API de herramientas.}
+  \label{tab:benchmark_consulta}
+\end{table}
+
+
+\section{Discusión de resultados}
+
+El conjunto de benchmarks realizados permite extraer conclusiones claras sobre la especialización de los modelos de lenguaje evaluados y su idoneidad para las distintas tareas dentro del sistema. Se observa una marcada dicotomía entre la capacidad de generación estructurada y la habilidad para el razonamiento complejo y uso de herramientas.
+
+\subsection{Especialización de Modelos por Tarea}
+
+\begin{itemize}
+    \item \textbf{Generación Estructurada (Parseo)}: En la tarea de transformar texto crudo a formato JSON, los modelos \texttt{llama3.1:8b} y \texttt{gemma3:12b} demostraron un rendimiento perfecto. Sin embargo, \texttt{llama3.1:8b} es la opción superior debido a su latencia significativamente menor. Por otro lado, \texttt{qwen3:4b} y \texttt{gpt-oss:20b} fallaron consistentemente, indicando una debilidad en la generación de JSON de formato abierto sin un esquema impuesto por la API.
+
+    \item \textbf{Uso de Herramientas y Razonamiento (Validación y Consulta)}: En las tareas que requieren la interacción con herramientas, el modelo \texttt{qwen3:4b} emergió como el más robusto y preciso. A pesar de su alta latencia, fue el único capaz de alcanzar una precisión del 100\% en la extracción de detalles finos (código CIIU) y en la ejecución de consultas complejas con el agente ReAct. Esto sugiere una capacidad superior para la atención y el razonamiento lógico en múltiples pasos.
+
+    \item \textbf{El Dilema del Equilibrio}: El modelo \texttt{llama3.1:8b} representa el mejor equilibrio entre velocidad y "suficiente" precisión para tareas de complejidad media. Fue rápido y perfecto en el parseo, y razonablemente bueno en la validación SUNAT (80\% de precisión en CIIU). Sin embargo, su fiabilidad disminuyó notablemente en el agente de consulta (50\% en argumentos), demostrando que su capacidad de razonamiento no escala tan bien como la de \texttt{qwen3:4b} para tareas multi-herramienta complejas.
+
+    \item \textbf{Incompatibilidad de Herramientas}: Se descubrió que \texttt{gemma3:12b} tiene una compatibilidad frágil con la API de herramientas. Aunque pudo realizar la llamada simple del validador SUNAT, falló consistentemente con la configuración multi-herramienta del agente de consulta, independientemente de los parámetros de configuración.
+\end{itemize}
+
+\section{Relación con los Objetivos Específicos}
+
+Los resultados experimentales validan el cumplimiento de los objetivos clave del proyecto:
+
+\begin{itemize}
+  \item El \textbf{objetivo de diseñar e implementar una arquitectura multiagente} se cumple. La implementación de un flujo de trabajo secuencial para la ingesta de datos, compuesto por agentes especializados (OCR, Parseador, Validador), y un agente de consulta basado en ReAct para la interacción con el usuario, demostró ser un enfoque funcional y robusto.
+
+  \item El \textbf{objetivo de analizar comparativamente distintos modelos de lenguaje} se ha logrado exhaustivamente. Los resultados no solo miden latencia y precisión, sino que revelan una conclusión fundamental: no existe un "mejor modelo" único, sino modelos que se especializan en distintas capacidades (generación vs. razonamiento). Esto valida la estrategia de una arquitectura multiagente donde se podría, en un futuro, asignar el modelo más adecuado para cada tarea específica (ej. \texttt{llama3.1:8b} para parsear y \texttt{qwen3:4b} para consultar).
+
+  \item El \textbf{objetivo de desarrollar un agente de consulta en lenguaje natural} se valida con éxito. Se demuestra que, utilizando el modelo \texttt{qwen3:4b}, el agente es capaz de interpretar preguntas complejas, inferir fechas y utilizar correctamente un conjunto de herramientas SQL para producir respuestas precisas, cumpliendo con los requisitos funcionales planteados.
+\end{itemize}
+
+Finalmente, se reconoce como trabajo futuro la necesidad de cuantificar el beneficio de esta arquitectura de agentes frente a un enfoque monolítico, así como la exploración de técnicas para mitigar la alta latencia de los modelos más precisos en tareas de razonamiento.

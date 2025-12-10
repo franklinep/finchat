@@ -72,7 +72,7 @@ class AgentePersistencia:
         emisor_data = self.contexto.comprobante_parseado["emisor"]
         validacion = self.contexto.validacion_sunat
 
-        ruc = emisor_data["ruc"]
+        ruc = "".join(filter(str.isdigit, emisor_data["ruc"]))[:11]
 
         # Buscar si ya existe
         emisor_existente = self.emisor_repo.buscar_por_ruc(ruc)
